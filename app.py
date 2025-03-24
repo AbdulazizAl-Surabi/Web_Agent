@@ -34,12 +34,12 @@ class AgentHistoryList:
 def parse_agent_history(history_str: str) -> None:
     console = Console()
     sections = history_str.split('ActionResult(')
-    for i, section in enumerate(sections[1:], 1):  # Überspringe den ersten leeren Abschnitt
+    for i, section in enumerate(sections[1:], 1):  # Skip the first empty section
         content = ''
         if 'extracted_content=' in section:
             content = section.split('extracted_content=')[1].split(',')[0].strip("'")
         if content:
-            header = Text(f'Schritt {i}', style='bold blue')
+            header = Text(f'Step {i}', style='bold blue')
             panel = Panel(content, title=header, border_style='blue')
             console.print(panel)
             console.print()
@@ -53,17 +53,16 @@ async def process_agent_task(
     pdf_file: Optional[Union[dict, str]] = None,
 ) -> str:
     if not api_key.strip():
-        return "Bitte einen API-Key angeben."
+        return "Please provide an API key."
 
     os.environ['OPENAI_API_KEY'] = api_key
 
-    pdf_info = "Kein PDF hochgeladen."
+    pdf_info = "No PDF uploaded."
     if pdf_file is not None:
-        # Prüfen, ob pdf_file ein Dictionary ist oder direkt ein Dateipfad (String)
         if isinstance(pdf_file, dict):
-            pdf_info = f"PDF hochgeladen: {pdf_file.get('name', 'unbekannt')}"
+            pdf_info = f"PDF uploaded: {pdf_file.get('name', 'unknown')}"
         else:
-            pdf_info = f"PDF hochgeladen: {pdf_file}"
+            pdf_info = f"PDF uploaded: {pdf_file}"
 
     try:
         agent = Agent(
@@ -73,62 +72,64 @@ async def process_agent_task(
         result = await agent.run()
         return f"{pdf_info}\n\nAgent Result:\n{result}"
     except Exception as e:
-        return f"Fehler beim Agent-Task: {e}"
+        return f"Error during agent task: {e}"
 
 
 def extract_pdf(pdf_file: Optional[Union[dict, str]], output_method: str) -> str:
     if not pdf_file:
-        return "Bitte ein PDF-Dokument hochladen."
+        return "Please upload a PDF document."
 
     try:
         from docling.document_converter import DocumentConverter
         converter = DocumentConverter()
-        # Bestimme den Dateipfad: entweder aus dem Dictionary oder direkt als String
         if isinstance(pdf_file, dict):
             pdf_path = pdf_file.get("name")
         else:
             pdf_path = pdf_file
 
         if not pdf_path:
-            return "Fehler: PDF-Dateipfad nicht gefunden."
+            return "Error: PDF file path not found."
 
         result = converter.convert(pdf_path)
         markdown_output = result.document.export_to_markdown()
-        if output_method == "Lokal speichern":
+        if output_method == "Save Locally":
             output_filename = "converted_output.md"
             with open(output_filename, "w", encoding="utf-8") as f:
                 f.write(markdown_output)
-            return f"PDF wurde konvertiert und in '{output_filename}' gespeichert."
+            return f"PDF converted and saved as '{output_filename}'."
         else:
             return markdown_output
     except Exception as e:
-        return f"Fehler bei der PDF-Konvertierung: {e}"
+        return f"Error during PDF conversion: {e}"
 
 
 def create_ui():
     with gr.Blocks(title="DATA ACQUISITION") as interface:
-        gr.Markdown("# Finde hochwertige Inhalte online")
+        # Centered title with BLUESCOUT and "BLUE" in caps and colored #0E5FF6
+        gr.Markdown("<h1 style='text-align: center; font-size: 60px;'><span style='color: #0E5FF6;'>BLUE</span>Scout</h1>")
+        gr.Markdown("## Find High-Quality Content Online")
 
         with gr.Row():
-            with gr.Column():
+            # Left Column: LLM Agent
+            with gr.Column(scale=1):
+                gr.Markdown("### LLM Agent Prompt")
                 api_key = gr.Textbox(label="OpenAI API Key", placeholder="sk-...", type="password")
-                task = gr.Textbox(label="Topic", placeholder='z.B. "neueste AI Nachrichten"', lines=3)
+                task = gr.Textbox(label="Topic", placeholder='e.g. "latest AI news"', lines=3)
                 model = gr.Dropdown(choices=["gpt-4", "gpt-3.5-turbo"], label="Model", value="gpt-4")
                 headless = gr.Checkbox(label="Run Headless", value=True)
-                pdf_file = gr.File(label="PDF Datei", file_count="single", file_types=[".pdf"])
-                submit_btn = gr.Button("Agent-Task ausführen")
-            with gr.Column():
+                submit_btn = gr.Button("Execute Agent Task")
                 output_agent = gr.Textbox(label="Agent Output", lines=15, interactive=False)
 
-        with gr.Row():
-            with gr.Column():
+            # Right Column: PDF Extraction
+            with gr.Column(scale=1):
+                gr.Markdown("### PDF Extraction")
+                pdf_file = gr.File(label="PDF File (Drag & Drop)", file_count="single", file_types=[".pdf"])
                 output_method = gr.Radio(
-                    choices=["Gradio anzeigen", "Lokal speichern"],
-                    label="Ausgabemethode",
-                    value="Gradio anzeigen"
+                    choices=["Display in Gradio", "Save Locally"],
+                    label="Output Method",
+                    value="Display in Gradio"
                 )
                 extract_btn = gr.Button("Extract PDF")
-            with gr.Column():
                 output_pdf = gr.Textbox(label="PDF Output", lines=15, interactive=False)
 
         submit_btn.click(
